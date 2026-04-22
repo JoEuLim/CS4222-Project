@@ -1,0 +1,188 @@
+import javax.swing.*;
+import javax.sound.midi.*;
+import java.awt.*;
+import java.awt.event.*;
+import java.util.*;
+
+// ONLY this class is public
+public class Piano extends JFrame {
+
+    public static void main(String[] args) {
+        new Piano();
+    }
+
+    public Piano() {
+        setTitle("Piano");
+        setSize(500, 300);
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+
+        PianoPanel panel = new PianoPanel();
+        add(panel);
+
+        setVisible(true);
+    }
+}
+
+// =========================
+// PANEL
+// =========================
+class PianoPanel extends JPanel {
+
+    private SoundPlayer sound = new SoundPlayer();
+    private PitchEngine pitch = new PitchEngine();
+    private PitchMeter meter = new PitchMeter();
+
+    private int[] notes = {60,62,64,65,67,69,71};
+
+    public PianoPanel() {
+        setLayout(new BorderLayout());
+
+        // TOP
+        JPanel top = new JPanel();
+
+        JButton crank = new JButton("Crank");
+        JButton lock = new JButton("Lock");
+
+        crank.addActionListener(e -> pitch.increasePitch());
+        lock.addActionListener(e -> pitch.lockPitch());
+
+        top.add(crank);
+        top.add(lock);
+        top.add(meter);
+
+        add(top, BorderLayout.NORTH);
+
+        // KEYS
+        JPanel keys = new JPanel(new GridLayout(1, notes.length));
+
+        for (int n : notes) {
+            JButton key = new JButton("" + n);
+
+            key.addMouseListener(new MouseAdapter() {
+                public void mousePressed(MouseEvent e) {
+                    sound.startNote(n);
+                }
+
+                public void mouseReleased(MouseEvent e) {
+                    sound.stopNote(n);
+                }
+            });
+
+            keys.add(key);
+        }
+
+        add(keys, BorderLayout.CENTER);
+
+        // CONNECT PITCH
+        pitch.setListener(val -> {
+            meter.setValue(val);
+            sound.bendPitch(val);
+        });
+    }
+}
+
+// =========================
+// SOUND
+// =========================
+class SoundPlayer {
+    private Synthesizer synth;
+    private MidiChannel channel;
+
+    public SoundPlayer() {
+        try {
+            synth = MidiSystem.getSynthesizer();
+            synth.open();
+            channel = synth.getChannels()[0];
+            channel.programChange(0);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void startNote(int note) {
+        channel.noteOn(note, 100);
+    }
+
+    public void stopNote(int note) {
+        channel.noteOff(note);
+    }
+
+    public void bendPitch(int value) {
+        int bend = 8192 + (int)((value / 1000.0) * (16383 - 8192));
+        channel.setPitchBend(bend);
+    }
+}
+
+// =========================
+// PITCH ENGINE
+// =========================
+class PitchEngine {
+    private int pitch = 0;
+    private Listener listener;
+
+    public PitchEngine() {
+    new javax.swing.Timer(100, e -> {
+        if (pitch > 0) {
+            pitch--;
+            notifyListener();
+        }
+    }).start();
+}
+
+    public void increasePitch() {
+        pitch += new Random().nextInt(100) + 1;
+        notifyListener();
+    }
+
+    public void lockPitch() {
+        // simple placeholder (no decay pause logic for now)
+    }
+
+    public void setListener(Listener l) {
+        this.listener = l;
+    }
+
+    private void notifyListener() {
+        if (listener != null) {
+            listener.onChange(pitch);
+        }
+    }
+
+    interface Listener {
+        void onChange(int value);
+    }
+}
+
+// =========================
+// METER
+// =========================
+class PitchMeter extends JComponent {
+    private int value = 0;
+
+    public PitchMeter() {
+        setPreferredSize(new Dimension(50, 150));
+    }
+
+    public void setValue(int v) {
+        value = Math.max(0, Math.min(1000, v));
+        repaint();
+    }
+
+    protected void paintComponent(Graphics g) {
+        super.paintComponent(g);
+
+        int h = getHeight();
+        int w = getWidth();
+
+        g.setColor(Color.GRAY);
+        g.fillRect(0, 0, w, h);
+
+        int bar = (int)((value / 1000.0) * h);
+
+        if (value < 400) g.setColor(Color.GREEN);
+        else if (value < 700) g.setColor(Color.ORANGE);
+        else g.setColor(Color.RED);
+
+        g.fillRect(0, h - bar, w, bar);
+    }
+}
