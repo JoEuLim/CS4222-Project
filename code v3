@@ -1,0 +1,253 @@
+import javax.swing.*;
+import javax.sound.midi.*;
+import java.awt.*;
+import java.awt.event.*;
+import java.util.Random;
+import java.util.HashMap;
+import java.util.Map;
+
+// ONLY this class is public
+public class Piano2 extends JFrame {
+
+    public static void main(String[] args) {
+        new Piano2();
+    }
+
+    public Piano2() {
+        setTitle("Group 6 Piano");
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+
+        PianoPanel panel = new PianoPanel();
+        add(panel);
+
+        pack();
+        setLocationRelativeTo(null);
+        setVisible(true);
+    }
+}
+
+// =========================
+// PANEL
+// =========================
+class PianoPanel extends JPanel {
+
+    private SoundPlayer sound = new SoundPlayer();
+    private PitchEngine pitch = new PitchEngine();
+    private PitchMeter meter  = new PitchMeter();
+
+    private int[] whiteNotes = {60,62,64,65,67,69,71, 72,74,76,77,79,81,83};
+
+    private boolean invertMode = false;
+    private boolean[] isSustained    = new boolean[128];
+    private boolean[] originalIsHeld = new boolean[128];
+
+    private JLabel statusLabel = new JLabel("Welcome! Press Crank to raise pitch.", SwingConstants.CENTER);
+
+    private Map<Integer, JButton> duplicateButtons = new HashMap<>();
+    private Map<Integer, JButton> originalButtons  = new HashMap<>();
+
+    public PianoPanel() {
+        setLayout(new BorderLayout(5, 5));
+        setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        setBackground(new Color(30, 30, 30));
+
+        JPanel topBar = new JPanel(new FlowLayout(FlowLayout.CENTER, 20, 8));
+        topBar.setBackground(new Color(45, 45, 45));
+
+        JButton crankButton = makeButton("Crank", new Color(60, 100, 60));
+        crankButton.addActionListener(e -> {
+            pitch.increasePitch();
+            statusLabel.setText("Cranked! Pitch: " + pitch.getPitch());
+        });
+        topBar.add(crankButton);
+
+        JButton lockButton = makeButton("Pitch Lock", new Color(80, 60, 120));
+        lockButton.addActionListener(e -> {
+            if (pitch.isLocked()) return;
+            lockButton.setEnabled(false);
+
+            int[] sec = {3};
+            lockButton.setText("Locked 3");
+
+            javax.swing.Timer t = new javax.swing.Timer(1000, null);
+            t.addActionListener(ev -> {
+                sec[0]--;
+                if (sec[0] > 0) {
+                    lockButton.setText("Locked " + sec[0]);
+                } else {
+                    t.stop();
+                    lockButton.setText("Pitch Lock");
+                    lockButton.setEnabled(true);
+                }
+            });
+            t.start();
+
+            pitch.lockPitch();
+        });
+        topBar.add(lockButton);
+
+        topBar.add(meter);
+
+        JButton invertButton = makeButton("Invert", new Color(120, 80, 30));
+        invertButton.addActionListener(e -> {
+            invertMode = !invertMode;
+            invertButton.setText(invertMode ? "Invert ON" : "Invert");
+        });
+        topBar.add(invertButton);
+
+        add(topBar, BorderLayout.NORTH);
+
+        statusLabel.setForeground(Color.WHITE);
+        add(statusLabel, BorderLayout.SOUTH);
+
+        JPanel keyboard = new JPanel(new GridLayout(2, whiteNotes.length));
+
+        for (int n : whiteNotes) {
+            JButton key = new JButton(noteName(n));
+            key.setBackground(Color.WHITE);
+
+            key.addMouseListener(new MouseAdapter() {
+                public void mousePressed(MouseEvent e) {
+                    sound.startNote(n);
+                }
+                public void mouseReleased(MouseEvent e) {
+                    sound.stopNote(n);
+                }
+            });
+
+            keyboard.add(key);
+        }
+
+        for (int n : whiteNotes) {
+            JButton key = new JButton(noteName(n) + " dup");
+            key.setBackground(new Color(210,190,240));
+
+            key.addMouseListener(new MouseAdapter() {
+                public void mousePressed(MouseEvent e) {
+                    sound.startNote(n);
+                }
+                public void mouseReleased(MouseEvent e) {
+                    sound.stopNote(n);
+                }
+            });
+
+            keyboard.add(key);
+        }
+
+        add(keyboard, BorderLayout.CENTER);
+
+        pitch.setListener(val -> {
+            meter.setValue(val);
+            sound.bendPitch(val);
+        });
+    }
+
+    private JButton makeButton(String t, Color c) {
+        JButton b = new JButton(t);
+        b.setBackground(c);
+        b.setForeground(Color.WHITE);
+        return b;
+    }
+
+    private String noteName(int n) {
+        String[] names = {"C","C#","D","D#","E","F","F#","G","G#","A","A#","B"};
+        return names[n % 12];
+    }
+}
+
+// =========================
+// SOUND
+// =========================
+class SoundPlayer {
+    private Synthesizer synth;
+    private MidiChannel ch;
+
+    public SoundPlayer() {
+        try {
+            synth = MidiSystem.getSynthesizer();
+            synth.open();
+            ch = synth.getChannels()[0];
+        } catch (Exception e) { e.printStackTrace(); }
+    }
+
+    public void startNote(int n) { ch.noteOn(n, 100); }
+    public void stopNote(int n) { ch.noteOff(n); }
+
+    public void bendPitch(int v) {
+        int bend = 8192 + (int)((v/1000.0)*(16383-8192));
+        ch.setPitchBend(bend);
+    }
+}
+
+// =========================
+// PITCH ENGINE
+// =========================
+class PitchEngine {
+    private int pitch = 0;
+    private boolean locked = false;
+    private Listener listener;
+
+    public PitchEngine() {
+        new javax.swing.Timer(100, e -> {
+            if (!locked && pitch > 0) {
+                pitch--;
+                notifyL();
+            }
+        }).start();
+    }
+
+    public void increasePitch() {
+        pitch += new Random().nextInt(100)+1;
+        notifyL();
+    }
+
+    public void lockPitch() {
+        locked = true;
+        new javax.swing.Timer(3000, e -> locked=false).start();
+    }
+
+    public int getPitch() { return pitch; }
+    public boolean isLocked() { return locked; }
+
+    public void setListener(Listener l) { listener = l; }
+
+    private void notifyL() {
+        if (listener != null) listener.onChange(pitch);
+    }
+
+    interface Listener {
+        void onChange(int v);
+    }
+}
+
+// =========================
+// METER
+// =========================
+class PitchMeter extends JComponent {
+    private int val = 0;
+
+    public PitchMeter() {
+        setPreferredSize(new Dimension(60,200));
+    }
+
+    public void setValue(int v) {
+        val = Math.max(0, Math.min(1000,v));
+        repaint();
+    }
+
+    protected void paintComponent(Graphics g) {
+        int h = getHeight();
+        int w = getWidth();
+
+        g.setColor(Color.DARK_GRAY);
+        g.fillRect(0,0,w,h);
+
+        int bar = (int)((val/1000.0)*h);
+
+        if (val<400) g.setColor(Color.GREEN);
+        else if (val<700) g.setColor(Color.ORANGE);
+        else g.setColor(Color.RED);
+
+        g.fillRect(0,h-bar,w,bar);
+    }
+}
