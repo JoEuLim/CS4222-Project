@@ -1,0 +1,517 @@
+import javax.swing.*;
+import javax.sound.midi.*;
+import java.awt.*;
+import java.awt.event.*;
+import java.util.Random;
+import java.util.HashMap;
+import java.util.Map;
+
+// ONLY this class is public
+public class Piano2 extends JFrame {
+
+    public static void main(String[] args) {
+        new Piano2();
+    }
+
+    public Piano2() {
+        setTitle("Group 6 Piano");
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+
+        PianoPanel panel = new PianoPanel();
+        add(panel);
+
+        pack();
+        setLocationRelativeTo(null);
+        setVisible(true);
+    }
+}
+
+// =========================
+// PANEL
+// =========================
+class PianoPanel extends JPanel {
+
+    private SoundPlayer sound = new SoundPlayer();
+    private PitchEngine pitch = new PitchEngine();
+    private PitchMeter  meter = new PitchMeter();
+
+    // White key note numbers for 2 octaves
+    private int[] whiteNotes = {60,62,64,65,67,69,71, 72,74,76,77,79,81,83};
+
+    // ★ STUDENT CODE: boolean flag for invert mode ★
+    private boolean invertMode = false;
+
+    // Track sustain state and which original keys are held down
+    // ★ STUDENT CODE: two boolean arrays to remember key states ★
+    private boolean[] isSustained    = new boolean[128];
+    private boolean[] originalIsHeld = new boolean[128];
+
+    // Status label so the user knows what is happening
+    // ★ STUDENT CODE: JLabel to display messages ★
+    private JLabel statusLabel = new JLabel("Welcome! Press Crank to raise pitch.", SwingConstants.CENTER);
+
+    // Keep references to buttons so we can change their colour
+    private Map<Integer, JButton> duplicateButtons = new HashMap<>();
+    private Map<Integer, JButton> originalButtons  = new HashMap<>();
+
+    public PianoPanel() {
+        setLayout(new BorderLayout(5, 5));
+        setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        setBackground(new Color(30, 30, 30));
+
+        // -------------------------------------------------------
+        // TOP BAR — Crank | Pitch Lock | Meter | Invert
+        // -------------------------------------------------------
+        // ★ STUDENT CODE: building the top control bar ★
+        JPanel topBar = new JPanel(new FlowLayout(FlowLayout.CENTER, 20, 8));
+        topBar.setBackground(new Color(45, 45, 45));
+
+        JButton crankButton = makeButton("Crank", new Color(60, 100, 60));
+        crankButton.addActionListener(e -> {
+            pitch.increasePitch();
+            // ★ STUDENT CODE: update the status message ★
+            statusLabel.setText("Cranked! Pitch: " + pitch.getPitch());
+        });
+        topBar.add(crankButton);
+
+        // ============================================================
+        //  Copilot prompt:
+        //  "Create a JButton labelled Pitch Lock. When clicked, call
+        //   lockPitch() on the PitchEngine. While locked, disable the
+        //   button and count down its label from Locked 3s to Locked 2s
+        //   to Locked 1s using a javax.swing.Timer that fires every
+        //   1 second. When the countdown hits 0, stop the timer,
+        //   re-enable the button and restore its label to Pitch Lock."
+        // ============================================================
+        JButton lockButton = makeButton("Pitch Lock", new Color(80, 60, 120));
+        lockButton.addActionListener(e -> {
+            if (pitch.isLocked()) return;
+            lockButton.setEnabled(false);
+            statusLabel.setText("Pitch locked for 3 seconds!");
+            int[] sec = {3};
+            lockButton.setText("Locked 3s");
+            javax.swing.Timer countdownTimer = new javax.swing.Timer(1000, null);
+            countdownTimer.addActionListener(ev -> {
+                sec[0]--;
+                if (sec[0] > 0) {
+                    lockButton.setText("Locked " + sec[0] + "s");
+                } else {
+                    countdownTimer.stop();
+                    lockButton.setText("Pitch Lock");
+                    lockButton.setEnabled(true);
+                    statusLabel.setText("Pitch unlocked. Current pitch: " + pitch.getPitch());
+                }
+            });
+            countdownTimer.start();
+            pitch.lockPitch();
+        });
+        topBar.add(lockButton);
+
+        topBar.add(meter);
+
+        // ★ STUDENT CODE: invert button toggles invertMode ★
+        JButton invertButton = makeButton("Invert", new Color(120, 80, 30));
+        invertButton.addActionListener(e -> {
+            invertMode = !invertMode;
+            if (invertMode) {
+                invertButton.setBackground(new Color(200, 120, 30));
+                invertButton.setText("Invert ON");
+                statusLabel.setText("Invert ON: normal keys now sustain, duplicate keys play normally.");
+            } else {
+                invertButton.setBackground(new Color(120, 80, 30));
+                invertButton.setText("Invert");
+                statusLabel.setText("Invert OFF: back to normal.");
+            }
+        });
+        topBar.add(invertButton);
+
+        add(topBar, BorderLayout.NORTH);
+
+        // -------------------------------------------------------
+        // STATUS BAR
+        // ★ STUDENT CODE: shows feedback messages at the bottom ★
+        // -------------------------------------------------------
+        statusLabel.setForeground(Color.WHITE);
+        statusLabel.setBackground(new Color(40, 40, 40));
+        statusLabel.setOpaque(true);
+        statusLabel.setBorder(BorderFactory.createEmptyBorder(4, 8, 4, 8));
+        add(statusLabel, BorderLayout.SOUTH);
+
+        // -------------------------------------------------------
+        // KEYBOARD
+        // FIX 1: Each note gets a small sub-panel containing its
+        //        original key on the LEFT and duplicate key on the
+        //        RIGHT, sitting side by side. All these sub-panels
+        //        are placed in a single row — so the layout looks
+        //        like a normal piano but every white key has its
+        //        own duplicate key directly beside it.
+        // -------------------------------------------------------
+        // ============================================================
+        //  Copilot prompt:
+        //  "Create a JPanel with a GridLayout of 1 row and as many
+        //   columns as there are notes. For each note, create a smaller
+        //   JPanel with 2 columns. In the left column place a white
+        //   JButton showing the note name (the original key). In the
+        //   right column place a light-purple JButton showing the note
+        //   name followed by dup (the duplicate key). Add MouseListeners
+        //   to both buttons. Store each button in a map keyed by note
+        //   number so colours can be changed later."
+        // ============================================================
+
+        // ★ STUDENT CODE: outer row that holds all key pairs ★
+        JPanel keyboardRow = new JPanel(new GridLayout(1, whiteNotes.length, 2, 0));
+        keyboardRow.setBackground(new Color(20, 20, 20));
+        keyboardRow.setBorder(BorderFactory.createEmptyBorder(6, 0, 6, 0));
+
+        for (int noteNumber : whiteNotes) {
+
+            // ★ STUDENT CODE: small panel — original key left, duplicate key right ★
+            JPanel keyPair = new JPanel(new GridLayout(1, 2, 1, 0));
+            keyPair.setBackground(new Color(20, 20, 20));
+
+            // --- Original key (left) ---
+            JButton originalKey = new JButton("<html><center>" + noteName(noteNumber) + "</center></html>");
+            originalKey.setBackground(Color.WHITE);
+            originalKey.setForeground(Color.BLACK);
+            originalKey.setFont(new Font("Arial", Font.PLAIN, 10));
+            originalKey.setFocusPainted(false);
+            originalKey.setMargin(new Insets(2, 1, 2, 1));
+            originalButtons.put(noteNumber, originalKey);
+
+            originalKey.addMouseListener(new MouseAdapter() {
+                public void mousePressed(MouseEvent e) {
+                    handleOriginalPress(noteNumber, originalKey);
+                }
+                public void mouseReleased(MouseEvent e) {
+                    handleOriginalRelease(noteNumber, originalKey);
+                }
+            });
+
+            // --- Duplicate key (right) ---
+            JButton duplicateKey = new JButton("<html><center>" + noteName(noteNumber) + "<br><small>dup</small></center></html>");
+            duplicateKey.setBackground(new Color(210, 190, 240));
+            duplicateKey.setForeground(new Color(80, 40, 120));
+            duplicateKey.setFont(new Font("Arial", Font.PLAIN, 9));
+            duplicateKey.setFocusPainted(false);
+            duplicateKey.setMargin(new Insets(2, 1, 2, 1));
+            duplicateButtons.put(noteNumber, duplicateKey);
+
+            duplicateKey.addMouseListener(new MouseAdapter() {
+                public void mousePressed(MouseEvent e) {
+                    handleDuplicatePress(noteNumber, duplicateKey);
+                }
+                public void mouseReleased(MouseEvent e) {
+                    handleDuplicateRelease(noteNumber, duplicateKey);
+                }
+            });
+
+            keyPair.add(originalKey);
+            keyPair.add(duplicateKey);
+            keyboardRow.add(keyPair);
+        }
+
+        add(keyboardRow, BorderLayout.CENTER);
+
+        // Connect pitch engine to meter and sound bending
+        pitch.setListener(val -> {
+            meter.setValue(val);
+            sound.bendPitch(val);
+        });
+    }
+
+    // -------------------------------------------------------
+    // KEY PRESS HANDLERS
+    // FIX 2 & 3: sustain logic and invert mode wired up here
+    // ★ STUDENT CODE: all key press and release logic lives here ★
+    // -------------------------------------------------------
+
+    // Called when an ORIGINAL key is pressed
+    private void handleOriginalPress(int noteNumber, JButton originalKey) {
+        if (!invertMode) {
+            // Normal mode: original key plays the note
+            originalIsHeld[noteNumber] = true;
+            if (isSustained[noteNumber]) {
+                // Pressing original while note is sustained cancels the sustain
+                cancelSustain(noteNumber);
+                statusLabel.setText("Sustain cancelled for " + noteName(noteNumber));
+            } else {
+                sound.startNote(noteNumber);
+                originalKey.setBackground(new Color(70, 130, 180));
+                statusLabel.setText("Playing " + noteName(noteNumber));
+            }
+        } else {
+            // Invert mode: original key now acts as the sustain key
+            if (isSustained[noteNumber] || originalIsHeld[noteNumber]) {
+                cancelSustain(noteNumber);
+                statusLabel.setText("Sustain cancelled for " + noteName(noteNumber));
+            } else {
+                isSustained[noteNumber]    = true;
+                originalIsHeld[noteNumber] = true;
+                sound.startNote(noteNumber);
+                originalKey.setBackground(new Color(230, 120, 30));
+                statusLabel.setText("Sustaining " + noteName(noteNumber) + " (Invert ON)");
+            }
+        }
+    }
+
+    // Called when an ORIGINAL key is released
+    private void handleOriginalRelease(int noteNumber, JButton originalKey) {
+        if (!invertMode) {
+            // Normal mode: stop note only if not currently sustained
+            originalIsHeld[noteNumber] = false;
+            if (!isSustained[noteNumber]) {
+                sound.stopNote(noteNumber);
+                originalKey.setBackground(Color.WHITE);
+            }
+        }
+        // Invert mode: original key is acting as sustain — do nothing on release
+    }
+
+    // Called when a DUPLICATE key is pressed
+    private void handleDuplicatePress(int noteNumber, JButton duplicateKey) {
+        if (!invertMode) {
+            // Normal mode: duplicate key is the sustain key
+            if (originalIsHeld[noteNumber] || isSustained[noteNumber]) {
+                // Original is held OR already sustained → cancel sustain
+                cancelSustain(noteNumber);
+                statusLabel.setText("Sustain cancelled for " + noteName(noteNumber));
+            } else {
+                // Start sustaining: note plays and keeps playing after release
+                isSustained[noteNumber] = true;
+                sound.startNote(noteNumber);
+                duplicateKey.setBackground(new Color(230, 120, 30));
+                statusLabel.setText("Sustaining " + noteName(noteNumber) + " — press original to cancel");
+            }
+        } else {
+            // Invert mode: duplicate key now plays normally
+            originalIsHeld[noteNumber] = true;
+            if (isSustained[noteNumber]) {
+                cancelSustain(noteNumber);
+                statusLabel.setText("Sustain cancelled for " + noteName(noteNumber));
+            } else {
+                sound.startNote(noteNumber);
+                duplicateKey.setBackground(new Color(70, 130, 180));
+                statusLabel.setText("Playing " + noteName(noteNumber) + " (Invert ON)");
+            }
+        }
+    }
+
+    // Called when a DUPLICATE key is released
+    private void handleDuplicateRelease(int noteNumber, JButton duplicateKey) {
+        if (!invertMode) {
+            // Normal mode: release does NOT stop the note if sustained
+            if (!isSustained[noteNumber]) {
+                duplicateKey.setBackground(new Color(210, 190, 240));
+            }
+        } else {
+            // Invert mode: duplicate was acting as normal key — stop on release
+            originalIsHeld[noteNumber] = false;
+            if (!isSustained[noteNumber]) {
+                sound.stopNote(noteNumber);
+                duplicateKey.setBackground(new Color(210, 190, 240));
+            }
+        }
+    }
+
+    // Cancels sustain for a note: stops the sound and resets button colours
+    // ★ STUDENT CODE: resets all state for one note ★
+    private void cancelSustain(int noteNumber) {
+        isSustained[noteNumber]    = false;
+        originalIsHeld[noteNumber] = false;
+        sound.stopNote(noteNumber);
+        JButton originalButton  = originalButtons.get(noteNumber);
+        JButton duplicateButton = duplicateButtons.get(noteNumber);
+        if (originalButton  != null) originalButton.setBackground(Color.WHITE);
+        if (duplicateButton != null) duplicateButton.setBackground(new Color(210, 190, 240));
+    }
+
+    // -------------------------------------------------------
+    // HELPERS
+    // ★ STUDENT CODE: small reusable helper methods ★
+    // -------------------------------------------------------
+
+    private JButton makeButton(String buttonText, Color backgroundColor) {
+        JButton button = new JButton(buttonText);
+        button.setBackground(backgroundColor);
+        button.setForeground(Color.WHITE);
+        button.setFont(new Font("Arial", Font.BOLD, 12));
+        button.setFocusPainted(false);
+        button.setOpaque(true);
+        return button;
+    }
+
+    // ★ STUDENT CODE: converts a note number into a readable name like C4 ★
+    private String noteName(int noteNumber) {
+        String[] noteNames = {"C","C#","D","D#","E","F","F#","G","G#","A","A#","B"};
+        return noteNames[noteNumber % 12] + (noteNumber / 12 - 1);
+    }
+}
+
+// =========================
+// SOUND PLAYER
+// =========================
+class SoundPlayer {
+
+    // ============================================================
+    //  Copilot prompt:
+    //  "Make a Java class called SoundPlayer. This class makes the
+    //   piano produce sound using tools already built into Java.
+    //   It needs: a way to start playing a note (takes a note number
+    //   and volume), a way to stop a note (takes the note number),
+    //   a way to bend the pitch of whatever is playing (takes a
+    //   number 0-1000 where 0 is no bend and 1000 is maximum bend
+    //   upward), and a way to shut everything down when the program
+    //   closes. If the sound system cannot open, print what went wrong."
+    // ============================================================
+
+    private Synthesizer synth;
+    private MidiChannel channel;
+
+    public SoundPlayer() {
+        try {
+            synth = MidiSystem.getSynthesizer();
+            synth.open();
+            channel = synth.getChannels()[0];
+            channel.programChange(0);
+        } catch (Exception error) {
+            error.printStackTrace();
+        }
+    }
+
+    public void startNote(int noteNumber) {
+        if (channel != null) channel.noteOn(noteNumber, 100);
+    }
+
+    public void stopNote(int noteNumber) {
+        if (channel != null) channel.noteOff(noteNumber);
+    }
+
+    public void bendPitch(int pitchValue) {
+        if (channel == null) return;
+        int bendAmount = 8192 + (int)((pitchValue / 1000.0) * (16383 - 8192));
+        bendAmount = Math.max(0, Math.min(16383, bendAmount));
+        channel.setPitchBend(bendAmount);
+    }
+
+    public void close() {
+        if (synth != null && synth.isOpen()) synth.close();
+    }
+}
+
+// =========================
+// PITCH ENGINE
+// =========================
+class PitchEngine {
+
+    // ============================================================
+    //  Copilot prompt:
+    //  "Create a Java class called PitchEngine. It stores a number
+    //   called pitch starting at zero. Every 100 milliseconds the
+    //   pitch drops by 1 but never below zero. There is a method
+    //   called increasePitch that adds a random number between 1 and
+    //   100 to pitch. There is a method called lockPitch that stops
+    //   the pitch from dropping for exactly 3 seconds then lets it
+    //   resume. There is a method getPitch that returns the current
+    //   pitch. There is a method isLocked that returns true if pitch
+    //   is currently locked. Whenever pitch changes, call a
+    //   registered listener."
+    // ============================================================
+
+    private int pitch  = 0;
+    private boolean locked = false;
+    private Listener listener;
+
+    public PitchEngine() {
+        new javax.swing.Timer(100, event -> {
+            if (!locked && pitch > 0) {
+                pitch--;
+                notifyListener();
+            }
+        }).start();
+    }
+
+    public void increasePitch() {
+        pitch += new Random().nextInt(100) + 1;
+        notifyListener();
+    }
+
+    public void lockPitch() {
+        locked = true;
+        javax.swing.Timer unlockTimer = new javax.swing.Timer(3000, event -> {
+            locked = false;
+            notifyListener();
+        });
+        unlockTimer.setRepeats(false);
+        unlockTimer.start();
+    }
+
+    public int getPitch()     { return pitch; }
+    public boolean isLocked() { return locked; }
+
+    public void setListener(Listener l) { listener = l; }
+
+    private void notifyListener() {
+        if (listener != null) listener.onChange(pitch);
+    }
+
+    interface Listener {
+        void onChange(int value);
+    }
+}
+
+// =========================
+// PITCH METER
+// =========================
+class PitchMeter extends JComponent {
+
+    // ============================================================
+    //  Copilot prompt:
+    //  "Create a Java class called PitchMeter that draws itself on
+    //   screen as a vertical coloured bar. The bar grows upward based
+    //   on a number between 0 and 1000. Green below 400, orange
+    //   between 400 and 699, red at 700 or above. Show the number as
+    //   text in the centre. The component is 60 pixels wide and
+    //   200 pixels tall. There is a setValue method that updates
+    //   the number and redraws the bar."
+    // ============================================================
+
+    private int currentValue = 0;
+
+    public PitchMeter() {
+        setPreferredSize(new Dimension(60, 200));
+    }
+
+    public void setValue(int newValue) {
+        currentValue = Math.max(0, Math.min(1000, newValue));
+        repaint();
+    }
+
+    protected void paintComponent(Graphics g) {
+        super.paintComponent(g);
+        int panelWidth  = getWidth();
+        int panelHeight = getHeight();
+
+        g.setColor(Color.DARK_GRAY);
+        g.fillRect(0, 0, panelWidth, panelHeight);
+
+        int barHeight = (int)((currentValue / 1000.0) * panelHeight);
+
+        if (currentValue < 400)      g.setColor(new Color(60, 180, 60));
+        else if (currentValue < 700) g.setColor(new Color(230, 160, 0));
+        else                         g.setColor(new Color(200, 40, 40));
+
+        g.fillRect(0, panelHeight - barHeight, panelWidth, barHeight);
+
+        // Draw the number in the centre of the meter
+        g.setColor(Color.WHITE);
+        g.setFont(new Font("Arial", Font.BOLD, 13));
+        String label = String.valueOf(currentValue);
+        FontMetrics fontMetrics = g.getFontMetrics();
+        g.drawString(label,
+            (panelWidth - fontMetrics.stringWidth(label)) / 2,
+            panelHeight / 2 + fontMetrics.getAscent() / 2);
+
+        g.setColor(Color.GRAY);
+        g.drawRect(0, 0, panelWidth - 1, panelHeight - 1);
+    }
+}
