@@ -267,18 +267,24 @@ class PianoPanel extends JPanel {
             if (blackAfterMap.containsKey(noteNumber)) {
                 int blackNote = blackAfterMap.get(noteNumber);
 
-                JButton blackKey = new JButton("<html><center><font color='white'>"
-                    + noteName(blackNote) + "</font></center></html>");
+                // ★ STUDENT CODE: plain text label so it shows on all platforms ★
+                JButton blackKey = new JButton(noteName(blackNote));
                 blackKey.setBackground(Color.BLACK);
                 blackKey.setForeground(Color.WHITE);
                 blackKey.setFont(new Font("Arial", Font.BOLD, 9));
                 blackKey.setFocusPainted(false);
                 blackKey.setMargin(new Insets(2, 1, 2, 1));
                 blackKey.setOpaque(true);
+                blackKey.setBorderPainted(false);
                 blackKeyButtons.put(blackNote, blackKey);
 
                 blackKey.addMouseListener(new MouseAdapter() {
                     public void mousePressed(MouseEvent e) {
+                        // ★ STUDENT CODE: block playing if pitch is too low ★
+                        if (pitch.getPitch() < 10) {
+                            statusLabel.setText("Pitch too low to play! Press Crank first. (Pitch: " + pitch.getPitch() + ")");
+                            return;
+                        }
                         sound.startNote(blackNote);
                         blackKey.setBackground(new Color(70, 130, 180));
                         statusLabel.setText("Playing " + noteName(blackNote));
@@ -311,6 +317,11 @@ class PianoPanel extends JPanel {
 
     // Called when an ORIGINAL key is pressed
     private void handleOriginalPress(int noteNumber, JButton originalKey) {
+        // ★ STUDENT CODE: block playing if pitch is too low ★
+        if (pitch.getPitch() < 10) {
+            statusLabel.setText("Pitch too low to play! Press Crank first. (Pitch: " + pitch.getPitch() + ")");
+            return;
+        }
         if (!invertMode) {
             // Normal mode: original key plays the note
             originalIsHeld[noteNumber] = true;
@@ -354,6 +365,11 @@ class PianoPanel extends JPanel {
 
     // Called when a DUPLICATE key is pressed
     private void handleDuplicatePress(int noteNumber, JButton duplicateKey) {
+        // ★ STUDENT CODE: block playing if pitch is too low ★
+        if (pitch.getPitch() < 10) {
+            statusLabel.setText("Pitch too low to play! Press Crank first. (Pitch: " + pitch.getPitch() + ")");
+            return;
+        }
         if (!invertMode) {
             // Normal mode: duplicate key is the sustain key
             if (originalIsHeld[noteNumber] || isSustained[noteNumber]) {
@@ -418,21 +434,55 @@ class PianoPanel extends JPanel {
 
     // Called every time any key is pressed — shows a popup if pitch is too low
     private void checkOutOfTune() {
-        // Pitch below 50 counts as "out of tune"
-        if (pitch.getPitch() < 50 && !popupShowing) {
+        // Pitch below 400 means orange or red zone — out of tune
+        if ((pitch.getPitch() > 100) && !popupShowing) {
             popupShowing = true;
             // Pick a random silly quote from the array
             String quote = sillyQuotes[new Random().nextInt(sillyQuotes.length)];
-            // JOptionPane pops up a small message box on screen
-            JOptionPane.showMessageDialog(
-                this,
-                "<html><center><b>⚠ You are out of tune! ⚠</b><br><br>"
-                    + quote + "<br><br>"
-                    + "<i>Current pitch: " + pitch.getPitch() + " — press Crank!</i></center></html>",
-                "Out of Tune Warning",
-                JOptionPane.WARNING_MESSAGE
-            );
-            popupShowing = false;
+            int currentPitch = pitch.getPitch();
+
+            // ★ STUDENT CODE: use a plain JDialog instead of JOptionPane —
+            //   JOptionPane is blocked by macOS when called from a mouse event,
+            //   but JDialog works on all platforms ★
+            SwingUtilities.invokeLater(() -> {
+
+                // JDialog is a basic popup window we build ourselves
+                JDialog dialog = new JDialog((JFrame) SwingUtilities.getWindowAncestor(this), "Out of Tune Warning", true);
+                dialog.setLayout(new BorderLayout(10, 10));
+                dialog.getContentPane().setBackground(new Color(40, 40, 40));
+
+                // Message text in the middle of the popup
+                JLabel message = new JLabel(
+                    "<html><center>"
+                    + "<font color=orange size=4><b>You are out of tune!</b></font><br><br>"
+                    + "<font color=white>" + quote + "</font><br><br>"
+                    + "<font color=gray><i>Current pitch: " + currentPitch + " - press Crank!</i></font>"
+                    + "</center></html>",
+                    SwingConstants.CENTER
+                );
+                message.setBorder(BorderFactory.createEmptyBorder(20, 20, 10, 20));
+                dialog.add(message, BorderLayout.CENTER);
+
+                // OK button at the bottom to close the popup
+                // ★ STUDENT CODE: JButton to close the dialog ★
+                JButton okButton = new JButton("OK, I will crank it!");
+                okButton.setBackground(new Color(60, 100, 60));
+                okButton.setForeground(Color.WHITE);
+                okButton.setFocusPainted(false);
+                okButton.setOpaque(true);
+                okButton.addActionListener(ev -> dialog.dispose());
+
+                JPanel buttonPanel = new JPanel();
+                buttonPanel.setBackground(new Color(40, 40, 40));
+                buttonPanel.add(okButton);
+                dialog.add(buttonPanel, BorderLayout.SOUTH);
+
+                dialog.setSize(420, 220);
+                dialog.setLocationRelativeTo(this);
+                dialog.setVisible(true);
+
+                popupShowing = false;
+            });
         }
     }
 
@@ -542,7 +592,7 @@ class PitchEngine {
     }
 
     public void increasePitch() {
-        pitch += new Random().nextInt(100) + 1;
+        pitch = Math.min(1000, pitch + new Random().nextInt(101)); // cap at 1000 so decay is always visible
         notifyListener();
     }
 
@@ -607,8 +657,8 @@ class PitchMeter extends JComponent {
 
         int barHeight = (int)((currentValue / 1000.0) * panelHeight);
 
-        if (currentValue < 400)      g.setColor(new Color(60, 180, 60));
-        else if (currentValue < 700) g.setColor(new Color(230, 160, 0));
+        if (currentValue <= 100)     g.setColor(new Color(60, 180, 60));   // green  = in tune (0-100)
+        else if (currentValue <= 700) g.setColor(new Color(230, 160, 0)); // yellow = getting off (101-700)
         else                         g.setColor(new Color(200, 40, 40));
 
         g.fillRect(0, panelHeight - barHeight, panelWidth, barHeight);
