@@ -53,6 +53,25 @@ class PianoPanel extends JPanel {
     // Keep references to buttons so we can change their colour
     private Map<Integer, JButton> duplicateButtons = new HashMap<>();
     private Map<Integer, JButton> originalButtons  = new HashMap<>();
+    private Map<Integer, JButton> blackKeyButtons  = new HashMap<>();
+
+    // ★ STUDENT CODE: silly quotes shown when pitch is low and you press a key ★
+    private String[] sillyQuotes = {
+        "You call that music? My cat sounds better falling off a shelf.",
+        "Even a broken clock is right twice a day. You are not a clock.",
+        "Keep going! The neighbours have already called the police anyway.",
+        "Your pitch is lower than my expectations, and those were already low.",
+        "Legend has it that somewhere, a piano is crying right now.",
+        "Technically that was a sound. Musically? We don't talk about it.",
+        "The good news: you are unique. The bad news: so is a car alarm.",
+        "Press Crank! The instrument is out of tune, not just your playing.",
+        "Scientists have discovered a new form of noise. Congratulations.",
+        "Out of tune and out of shame. A true artist."
+    };
+
+    // Tracks whether the out-of-tune popup is already showing (so it doesn't spam)
+    // ★ STUDENT CODE: boolean to stop the popup appearing over and over ★
+    private boolean popupShowing = false;
 
     public PianoPanel() {
         setLayout(new BorderLayout(5, 5));
@@ -139,13 +158,17 @@ class PianoPanel extends JPanel {
 
         // -------------------------------------------------------
         // KEYBOARD
-        // FIX 1: Each note gets a small sub-panel containing its
-        //        original key on the LEFT and duplicate key on the
-        //        RIGHT, sitting side by side. All these sub-panels
-        //        are placed in a single row — so the layout looks
-        //        like a normal piano but every white key has its
-        //        own duplicate key directly beside it.
+        // Each white note gets a sub-panel: [original | duplicate]
+        // Black keys are inserted between the pairs that have a
+        // sharp between them (C-D, D-E, F-G, G-A, A-B).
+        // The order per octave is:
+        //   C | Cdup | C# | D | Ddup | D# | E | Edup |
+        //   F | Fdup | F# | G | Gdup | G# | A | Adup | A# | B | Bdup
         // -------------------------------------------------------
+
+        // Work out how many columns we need:
+        // 14 white notes → 14 pairs + 10 black keys (5 per octave × 2 octaves)
+        // = 34 columns total
         // ============================================================
         //  Copilot prompt:
         //  "Create a JPanel with a GridLayout of 1 row and as many
@@ -158,8 +181,29 @@ class PianoPanel extends JPanel {
         //   number so colours can be changed later."
         // ============================================================
 
-        // ★ STUDENT CODE: outer row that holds all key pairs ★
-        JPanel keyboardRow = new JPanel(new GridLayout(1, whiteNotes.length, 2, 0));
+        // Black key note numbers for each octave (C#, D#, F#, G#, A#)
+        // In MIDI: C#=61, D#=63, F#=66, G#=68, A#=70  (repeat +12 for octave 2)
+        // We need to know AFTER which white note each black key appears:
+        // C# appears after C (60), D# after D (62), F# after F (65),
+        // G# after G (67), A# after A (69)
+        // Same pattern for octave 2 (all +12)
+        int[] blackAfterWhite = {60, 62, 65, 67, 69,   72, 74, 77, 79, 81};
+        int[] blackNoteNumbers= {61, 63, 66, 68, 70,   73, 75, 78, 80, 82};
+
+        // Build a lookup: whiteNote → blackNoteNumber that follows it
+        Map<Integer, Integer> blackAfterMap = new HashMap<>();
+        for (int i = 0; i < blackAfterWhite.length; i++) {
+            blackAfterMap.put(blackAfterWhite[i], blackNoteNumbers[i]);
+        }
+
+        // Count total columns
+        int totalColumns = whiteNotes.length; // white pairs
+        for (int noteNumber : whiteNotes) {
+            if (blackAfterMap.containsKey(noteNumber)) totalColumns++; // black key slot
+        }
+
+        // ★ STUDENT CODE: outer row that holds all key pairs and black keys ★
+        JPanel keyboardRow = new JPanel(new GridLayout(1, totalColumns, 2, 0));
         keyboardRow.setBackground(new Color(20, 20, 20));
         keyboardRow.setBorder(BorderFactory.createEmptyBorder(6, 0, 6, 0));
 
@@ -208,6 +252,46 @@ class PianoPanel extends JPanel {
             keyPair.add(originalKey);
             keyPair.add(duplicateKey);
             keyboardRow.add(keyPair);
+
+            // --- Black key inserted AFTER this white pair if one exists ---
+            // ============================================================
+            //  Copilot prompt:
+            //  "After adding each white key pair to the keyboard row,
+            //   check a map to see if a black key follows that white note.
+            //   If so, create a JButton with a black background and white
+            //   text showing the sharp note name (e.g. C#4). Add a
+            //   MouseListener that plays the note on press and stops it
+            //   on release. Store the button in a blackKeyButtons map.
+            //   Add the button directly to the keyboard row."
+            // ============================================================
+            if (blackAfterMap.containsKey(noteNumber)) {
+                int blackNote = blackAfterMap.get(noteNumber);
+
+                JButton blackKey = new JButton("<html><center><font color='white'>"
+                    + noteName(blackNote) + "</font></center></html>");
+                blackKey.setBackground(Color.BLACK);
+                blackKey.setForeground(Color.WHITE);
+                blackKey.setFont(new Font("Arial", Font.BOLD, 9));
+                blackKey.setFocusPainted(false);
+                blackKey.setMargin(new Insets(2, 1, 2, 1));
+                blackKey.setOpaque(true);
+                blackKeyButtons.put(blackNote, blackKey);
+
+                blackKey.addMouseListener(new MouseAdapter() {
+                    public void mousePressed(MouseEvent e) {
+                        sound.startNote(blackNote);
+                        blackKey.setBackground(new Color(70, 130, 180));
+                        statusLabel.setText("Playing " + noteName(blackNote));
+                        checkOutOfTune();
+                    }
+                    public void mouseReleased(MouseEvent e) {
+                        sound.stopNote(blackNote);
+                        blackKey.setBackground(Color.BLACK);
+                    }
+                });
+
+                keyboardRow.add(blackKey);
+            }
         }
 
         add(keyboardRow, BorderLayout.CENTER);
@@ -238,6 +322,7 @@ class PianoPanel extends JPanel {
                 sound.startNote(noteNumber);
                 originalKey.setBackground(new Color(70, 130, 180));
                 statusLabel.setText("Playing " + noteName(noteNumber));
+                checkOutOfTune();
             }
         } else {
             // Invert mode: original key now acts as the sustain key
@@ -281,6 +366,7 @@ class PianoPanel extends JPanel {
                 sound.startNote(noteNumber);
                 duplicateKey.setBackground(new Color(230, 120, 30));
                 statusLabel.setText("Sustaining " + noteName(noteNumber) + " — press original to cancel");
+                checkOutOfTune();
             }
         } else {
             // Invert mode: duplicate key now plays normally
@@ -323,6 +409,31 @@ class PianoPanel extends JPanel {
         JButton duplicateButton = duplicateButtons.get(noteNumber);
         if (originalButton  != null) originalButton.setBackground(Color.WHITE);
         if (duplicateButton != null) duplicateButton.setBackground(new Color(210, 190, 240));
+    }
+
+    // -------------------------------------------------------
+    // OUT-OF-TUNE POPUP
+    // ★ STUDENT CODE: shows a silly quote when pitch is too low ★
+    // -------------------------------------------------------
+
+    // Called every time any key is pressed — shows a popup if pitch is too low
+    private void checkOutOfTune() {
+        // Pitch below 50 counts as "out of tune"
+        if (pitch.getPitch() < 50 && !popupShowing) {
+            popupShowing = true;
+            // Pick a random silly quote from the array
+            String quote = sillyQuotes[new Random().nextInt(sillyQuotes.length)];
+            // JOptionPane pops up a small message box on screen
+            JOptionPane.showMessageDialog(
+                this,
+                "<html><center><b>⚠ You are out of tune! ⚠</b><br><br>"
+                    + quote + "<br><br>"
+                    + "<i>Current pitch: " + pitch.getPitch() + " — press Crank!</i></center></html>",
+                "Out of Tune Warning",
+                JOptionPane.WARNING_MESSAGE
+            );
+            popupShowing = false;
+        }
     }
 
     // -------------------------------------------------------
