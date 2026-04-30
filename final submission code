@@ -11,10 +11,10 @@ import java.util.*;
 public class PiaHellNo extends JFrame {
 
     public static void main(String[] args) {
-        new PianoHellNo();
+        new PiaHellNo();
     }
 
-    public PianoHellNo() {
+    public PiaHellNo() {
         setTitle("PiaHellNo");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
@@ -49,7 +49,7 @@ class PianoPanel extends JPanel {
 
     // Status label so the user knows what is happening
     // JLabel to display messages 
-    private JLabel statusLabel = new JLabel("Welcome to Pia"hell"No! Press Crank to raise pitch.", SwingConstants.CENTER);
+    private JLabel statusLabel = new JLabel("Welcome to PiahellNo! Press Crank to raise pitch.", SwingConstants.CENTER);
 
     // Keep references to buttons so we can change their colour
     private Map<Integer, JButton> duplicateButtons = new HashMap<>();
