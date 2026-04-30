@@ -608,20 +608,6 @@ class SoundPlayer {
 // -------------
 class PitchEngine {
 
-    // ============================================================
-    //  Copilot prompt:
-    //  "Create a Java class called PitchEngine. It stores a number
-    //   called pitch starting at zero. Every 100 milliseconds the
-    //   pitch drops by 1 but never below zero. There is a method
-    //   called increasePitch that adds a random number between 1 and
-    //   100 to pitch. There is a method called lockPitch that stops
-    //   the pitch from dropping for exactly 3 seconds then lets it
-    //   resume. There is a method getPitch that returns the current
-    //   pitch. There is a method isLocked that returns true if pitch
-    //   is currently locked. Whenever pitch changes, call a
-    //   registered listener."
-    // ============================================================
-
     private int pitch  = 0;
     private boolean locked = false;
     private Listener listener;
@@ -668,17 +654,6 @@ class PitchEngine {
 // Pitch Meter (AI Generated)
 // -------------
 class PitchMeter extends JComponent {
-
-    // ============================================================
-    //  Copilot prompt:
-    //  "Create a Java class called PitchMeter that draws itself on
-    //   screen as a vertical coloured bar. The bar grows upward based
-    //   on a number between 0 and 1000. Green below 400, orange
-    //   between 400 and 699, red at 700 or above. Show the number as
-    //   text in the centre. The component is 60 pixels wide and
-    //   200 pixels tall. There is a setValue method that updates
-    //   the number and redraws the bar."
-    // ============================================================
 
     private int currentValue = 0;
 
