@@ -1,20 +1,21 @@
 import javax.swing.*;
 import javax.sound.midi.*;
-import java.awt.*;
-import java.awt.event.*;
-import java.util.Random;
-import java.util.HashMap;
-import java.util.Map;
 
-// ONLY this class is public
-public class Piano2 extends JFrame {
+// AWT is needed for graphics/colour
+import java.awt.*;
+
+// AWT event is needed of input handling
+import java.awt.event.*;
+import java.util.*;
+
+public class PiaHellNo extends JFrame {
 
     public static void main(String[] args) {
-        new Piano2();
+        new PianoHellNo();
     }
 
-    public Piano2() {
-        setTitle("Group 6 Piano");
+    public PianoHellNo() {
+        setTitle("PiaHellNo");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
         PianoPanel panel = new PianoPanel();
@@ -26,9 +27,9 @@ public class Piano2 extends JFrame {
     }
 }
 
-// =========================
-// PANEL
-// =========================
+// -----------
+// Piano Panel
+//-------------
 class PianoPanel extends JPanel {
 
     private SoundPlayer sound = new SoundPlayer();
@@ -38,24 +39,24 @@ class PianoPanel extends JPanel {
     // White key note numbers for 2 octaves
     private int[] whiteNotes = {60,62,64,65,67,69,71, 72,74,76,77,79,81,83};
 
-    // ★ STUDENT CODE: boolean flag for invert mode ★
+    // boolean flag for invert mode
     private boolean invertMode = false;
 
     // Track sustain state and which original keys are held down
-    // ★ STUDENT CODE: two boolean arrays to remember key states ★
+    // Two boolean arrays to remember key states
     private boolean[] isSustained    = new boolean[128];
     private boolean[] originalIsHeld = new boolean[128];
 
     // Status label so the user knows what is happening
-    // ★ STUDENT CODE: JLabel to display messages ★
-    private JLabel statusLabel = new JLabel("Welcome! Press Crank to raise pitch.", SwingConstants.CENTER);
+    // JLabel to display messages 
+    private JLabel statusLabel = new JLabel("Welcome to Pia"hell"No! Press Crank to raise pitch.", SwingConstants.CENTER);
 
     // Keep references to buttons so we can change their colour
     private Map<Integer, JButton> duplicateButtons = new HashMap<>();
     private Map<Integer, JButton> originalButtons  = new HashMap<>();
     private Map<Integer, JButton> blackKeyButtons  = new HashMap<>();
 
-    // ★ STUDENT CODE: silly quotes shown when pitch is low and you press a key ★
+    // Silly quotes shown when pitch is low and you press a key
     private String[] sillyQuotes = {
         "You call that music? My cat sounds better falling off a shelf.",
         "Even a broken clock is right twice a day. You are not a clock.",
@@ -69,8 +70,8 @@ class PianoPanel extends JPanel {
         "Out of tune and out of shame. A true artist."
     };
 
-    // Tracks whether the out-of-tune popup is already showing (so it doesn't spam)
-    // ★ STUDENT CODE: boolean to stop the popup appearing over and over ★
+    // Tracking if the out-of-tune popup is already showing
+    // boolean to stop the popup appearing over and over
     private boolean popupShowing = false;
 
     public PianoPanel() {
@@ -78,30 +79,25 @@ class PianoPanel extends JPanel {
         setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
         setBackground(new Color(30, 30, 30));
 
-        // -------------------------------------------------------
-        // TOP BAR — Crank | Pitch Lock | Meter | Invert
-        // -------------------------------------------------------
-        // ★ STUDENT CODE: building the top control bar ★
+        // building the top control bar 
+
         JPanel topBar = new JPanel(new FlowLayout(FlowLayout.CENTER, 20, 8));
         topBar.setBackground(new Color(45, 45, 45));
 
+        // building the crank button
         JButton crankButton = makeButton("Crank", new Color(60, 100, 60));
+
+        // AI generated listner (vinny prompts ss)
         crankButton.addActionListener(e -> {
             pitch.increasePitch();
-            // ★ STUDENT CODE: update the status message ★
             statusLabel.setText("Cranked! Pitch: " + pitch.getPitch());
         });
         topBar.add(crankButton);
 
-        // ============================================================
-        //  Copilot prompt:
-        //  "Create a JButton labelled Pitch Lock. When clicked, call
-        //   lockPitch() on the PitchEngine. While locked, disable the
-        //   button and count down its label from Locked 3s to Locked 2s
-        //   to Locked 1s using a javax.swing.Timer that fires every
-        //   1 second. When the countdown hits 0, stop the timer,
-        //   re-enable the button and restore its label to Pitch Lock."
-        // ============================================================
+        //-------------------------------------
+        //  Pitch Lock button (AI generated)
+        //-------------------------------------
+
         JButton lockButton = makeButton("Pitch Lock", new Color(80, 60, 120));
         lockButton.addActionListener(e -> {
             if (pitch.isLocked()) return;
@@ -128,7 +124,8 @@ class PianoPanel extends JPanel {
 
         topBar.add(meter);
 
-        // ★ STUDENT CODE: invert button toggles invertMode ★
+        // Student Code
+        // invert button toggles invertMode 
         JButton invertButton = makeButton("Invert", new Color(120, 80, 30));
         invertButton.addActionListener(e -> {
             invertMode = !invertMode;
@@ -146,56 +143,42 @@ class PianoPanel extends JPanel {
 
         add(topBar, BorderLayout.NORTH);
 
-        // -------------------------------------------------------
-        // STATUS BAR
-        // ★ STUDENT CODE: shows feedback messages at the bottom ★
-        // -------------------------------------------------------
+        //-------------
+        // Status Bar
+        //-------------
+        // showing feedback messages at the bottom 
+
         statusLabel.setForeground(Color.WHITE);
         statusLabel.setBackground(new Color(40, 40, 40));
         statusLabel.setOpaque(true);
         statusLabel.setBorder(BorderFactory.createEmptyBorder(4, 8, 4, 8));
         add(statusLabel, BorderLayout.SOUTH);
 
-        // -------------------------------------------------------
-        // KEYBOARD — custom painted panel so black keys overlap
-        // white keys exactly like a real piano (Windows rendering).
-        // Layout per white key: [original | duplicate] side by side.
-        // Black keys are drawn on top at the boundary between two
-        // white key pairs and are shorter (60% height).
-        // -------------------------------------------------------
 
-        // Which white note has a black key to its RIGHT
-        // C#=61 sits right of C=60, D#=63 right of D=62, etc.
-        int[] blackAfterWhite  = {60,62,65,67,69, 72,74,77,79,81};
-        int[] blackNoteNumbers = {61,63,66,68,70, 73,75,78,80,82};
+        // Keyboard layout so that black keys overlap white keys (AI generated)
+        int[] blackAfterWhite  = {60,62,65,67,69, 72,74,77,79,81}; // C4, D4, F4, G4, A4, C5, D5, F5, G5, A5
+        int[] blackNoteNumbers = {61,63,66,68,70, 73,75,78,80,82}; // C#4, D#4, F#4, G#4, A#4, C#5, D#5, F#5, G#5, A#5
 
         Map<Integer, Integer> blackAfterMap = new HashMap<>();
         for (int i = 0; i < blackAfterWhite.length; i++) {
             blackAfterMap.put(blackAfterWhite[i], blackNoteNumbers[i]);
         }
 
+        // Student code
         // Each white note = 2 columns (original + duplicate).
-        // Total white columns = whiteNotes.length * 2
-        // We use pixel-based painting so column count doesn't matter for black keys.
-        final int WHITE_KEY_WIDTH  = 44;  // width of ONE white sub-key (original or dup)
+        // Total white columns will be whiteNotes.length * 2
+
+        final int WHITE_KEY_WIDTH  = 44;  // this will be the width of ONE white sub-key (original or duplicate)
         final int PAIR_WIDTH       = WHITE_KEY_WIDTH * 2; // original + duplicate together
         final int WHITE_KEY_HEIGHT = 160;
         final int BLACK_KEY_WIDTH  = 26;
-        final int BLACK_KEY_HEIGHT = 96; // 60% of white height
+        final int BLACK_KEY_HEIGHT = 96;
         final int TOTAL_WIDTH      = whiteNotes.length * PAIR_WIDTH;
 
-        // ============================================================
-        //  Copilot prompt:
-        //  "Create a JPanel subclass that overrides paintComponent.
-        //   Draw white key pairs (original + duplicate) as rectangles
-        //   side by side across the panel. Then draw black keys as
-        //   smaller darker rectangles on top, centred on the boundary
-        //   between the current white pair and the next one.
-        //   Handle mouse clicks by checking coordinates against the
-        //   black key rectangles first, then the white key rectangles."
-        // ============================================================
+        //-------------
+        // Piano Layout (AI generated)
+        //--------------
 
-        // ★ STUDENT CODE: custom painted keyboard panel ★
         JPanel keyboardRow = new JPanel(null) {  // null layout = we position everything ourselves
 
             // Store the pixel rectangles for hit-testing mouse clicks
@@ -291,7 +274,8 @@ class PianoPanel extends JPanel {
                 }
             }
 
-            // ★ STUDENT CODE: converts a note number to a name inside the painted panel ★
+            // Student Code
+            // converting a note number to a name inside the painted panel 
             private String noteName(int noteNumber) {
                 String[] noteNames = {"C","C#","D","D#","E","F","F#","G","G#","A","A#","B"};
                 return noteNames[noteNumber % 12] + (noteNumber / 12 - 1);
@@ -301,11 +285,10 @@ class PianoPanel extends JPanel {
         keyboardRow.setPreferredSize(new Dimension(TOTAL_WIDTH, WHITE_KEY_HEIGHT + 10));
         keyboardRow.setBackground(new Color(20, 20, 20));
 
-        // -------------------------------------------------------
-        // MOUSE HANDLER on the painted keyboard
-        // Hit-test black rects first (they are on top), then white.
-        // ★ STUDENT CODE: mouse clicks routed to the right handler ★
-        // -------------------------------------------------------
+        //-----
+        // Mouse Click Detection on the keyboard (AI generated)
+        //------
+
         keyboardRow.addMouseListener(new MouseAdapter() {
 
             // Rebuild rect lists (same logic as inside the panel)
@@ -338,7 +321,7 @@ class PianoPanel extends JPanel {
                     int blackX = rect[0], blackNote = rect[1];
                     if (mx >= blackX && mx <= blackX + BLACK_KEY_WIDTH
                             && my >= 0 && my <= BLACK_KEY_HEIGHT) {
-                        // ★ STUDENT CODE: block if pitch too low ★
+                        
                         if (pitch.getPitch() < 10) {
                             statusLabel.setText("Pitch too low! Press Crank first. (Pitch: " + pitch.getPitch() + ")");
                             return;
@@ -359,7 +342,7 @@ class PianoPanel extends JPanel {
                     int x = rect[0], noteNumber = rect[1];
                     boolean isDup = rect[2] == 1;
                     if (mx >= x && mx <= x + WHITE_KEY_WIDTH && my >= 0 && my <= WHITE_KEY_HEIGHT) {
-                        // ★ STUDENT CODE: XOR with invertMode so clicking the original key
+
                         //   routes to the duplicate handler when invert is on, and vice versa.
                         //   This means the POSITION of your click never changes — only which
                         //   function (sustain vs normal) that physical key performs. ★
@@ -399,7 +382,7 @@ class PianoPanel extends JPanel {
                     int x = rect[0], noteNumber = rect[1];
                     boolean isDup = rect[2] == 1;
                     if (mx >= x && mx <= x + WHITE_KEY_WIDTH && my >= 0 && my <= WHITE_KEY_HEIGHT) {
-                        // ★ STUDENT CODE: same XOR swap on release as on press ★
+                  
                         boolean treatAsDup = isDup ^ invertMode;
                         if (!treatAsDup) {
                             JButton fakeButton = originalButtons.computeIfAbsent(noteNumber, k -> new JButton());
@@ -414,7 +397,8 @@ class PianoPanel extends JPanel {
                 }
             }
 
-            // ★ STUDENT CODE: note name helper inside the mouse handler ★
+            // STUDENT CODE
+            // Note name helper inside the mouse handler 
             private String noteName(int noteNumber) {
                 String[] noteNames = {"C","C#","D","D#","E","F","F#","G","G#","A","A#","B"};
                 return noteNames[noteNumber % 12] + (noteNumber / 12 - 1);
@@ -423,33 +407,27 @@ class PianoPanel extends JPanel {
 
         add(keyboardRow, BorderLayout.CENTER);
 
-        // Connect pitch engine to meter and sound bending
+        // Connecting all systems (AI GENERATED)
         pitch.setListener(val -> {
             meter.setValue(val);
             sound.bendPitch(val);
         });
     }
 
-    // -------------------------------------------------------
-    // KEY PRESS HANDLERS
-    // invertMode is handled entirely by the ROUTER above.
-    // These handlers each do exactly ONE job with no invertMode checks.
-    // handleOriginalPress  = ALWAYS plays the note normally
-    // handleDuplicatePress = ALWAYS acts as the sustain key
-    // The router swaps which handler each physical key calls when invert is on.
-    // ★ STUDENT CODE: all key press and release logic lives here ★
-    // -------------------------------------------------------
+    // --------------------------------
+    // Key Press Handlers (Student Code)
+    //--------------------------------
 
-    // Plays the note normally — no sustain (routed from whichever key is the "play" key)
+    // Plays the note normally with no sustain
     private void handleOriginalPress(int noteNumber, JButton originalKey) {
-        // ★ STUDENT CODE: block playing if pitch is too low ★
+        // block playing if pitch is too low 
         if (pitch.getPitch() < 10) {
             statusLabel.setText("Pitch too low to play! Press Crank first. (Pitch: " + pitch.getPitch() + ")");
             return;
         }
         originalIsHeld[noteNumber] = true;
         if (isSustained[noteNumber]) {
-            // Note is already sustained — pressing the play key cancels sustain
+            // Note is already sustained so pressing the play key cancels sustain
             cancelSustain(noteNumber);
             statusLabel.setText("Sustain cancelled for " + noteName(noteNumber));
         } else {
@@ -459,7 +437,7 @@ class PianoPanel extends JPanel {
         }
     }
 
-    // Releases the normal play key — stops note unless sustained
+    // Releases the normal play key which stops note unless sustained
     private void handleOriginalRelease(int noteNumber, JButton originalKey) {
         originalIsHeld[noteNumber] = false;
         if (!isSustained[noteNumber]) {
@@ -467,15 +445,15 @@ class PianoPanel extends JPanel {
         }
     }
 
-    // Activates sustain — routed from whichever key is the "sustain" key
+    // Activates sustain
     private void handleDuplicatePress(int noteNumber, JButton duplicateKey) {
-        // ★ STUDENT CODE: block playing if pitch is too low ★
+        // block playing if pitch is too low
         if (pitch.getPitch() < 10) {
             statusLabel.setText("Pitch too low to play! Press Crank first. (Pitch: " + pitch.getPitch() + ")");
             return;
         }
         if (originalIsHeld[noteNumber] || isSustained[noteNumber]) {
-            // Play key is held OR already sustained → cancel sustain
+            // Play key is held or already sustained therefore cancel sustain
             cancelSustain(noteNumber);
             statusLabel.setText("Sustain cancelled for " + noteName(noteNumber));
         } else {
@@ -487,13 +465,13 @@ class PianoPanel extends JPanel {
         }
     }
 
-    // Releases the sustain key — note keeps ringing if sustained
+    // Releases the sustain key
     private void handleDuplicateRelease(int noteNumber, JButton duplicateKey) {
         // Sustain key released — do nothing, note keeps playing until cancelled
     }
 
     // Cancels sustain for a note: stops the sound and resets button colours
-    // ★ STUDENT CODE: resets all state for one note ★
+    // resets all state for one note
     private void cancelSustain(int noteNumber) {
         isSustained[noteNumber]    = false;
         originalIsHeld[noteNumber] = false;
@@ -505,28 +483,26 @@ class PianoPanel extends JPanel {
     }
 
     // -------------------------------------------------------
-    // OUT-OF-TUNE POPUP
-    // ★ STUDENT CODE: shows a silly quote when pitch is too low ★
+    // Out of tune Pop Up
+    // shows a silly quote when pitch is too low
     // -------------------------------------------------------
 
-    // Called every time any key is pressed — shows a popup if pitch is too low
+    // Called every time any key is pressed and shows a popup if rhe pitch is too low
     private void checkOutOfTune() {
-        // Pitch below 400 means orange or red zone — out of tune
-        // Out of tune = outside all three green bands (10-100, 250-350, 550-650)
+        // Pitch below 400 means out of tune
+        // Out of tune = outside all three declared green zones (10-100, 250-350, 550-650)
         int p = pitch.getPitch();
         boolean pitchInTune = (p >= 10 && p <= 100) || (p >= 250 && p <= 350) || (p >= 550 && p <= 650);
         if (!pitchInTune && !popupShowing) {
             popupShowing = true;
-            // Pick a random silly quote from the array
+            // Picking a random quote 
             String quote = sillyQuotes[new Random().nextInt(sillyQuotes.length)];
             int currentPitch = pitch.getPitch();
 
-            // ★ STUDENT CODE: use a plain JDialog instead of JOptionPane —
-            //   JOptionPane is blocked by macOS when called from a mouse event,
-            //   but JDialog works on all platforms ★
+
+            //AI Generated            
             SwingUtilities.invokeLater(() -> {
 
-                // JDialog is a basic popup window we build ourselves
                 JDialog dialog = new JDialog((JFrame) SwingUtilities.getWindowAncestor(this), "Out of Tune Warning", true);
                 dialog.setLayout(new BorderLayout(10, 10));
                 dialog.getContentPane().setBackground(new Color(40, 40, 40));
@@ -543,8 +519,8 @@ class PianoPanel extends JPanel {
                 message.setBorder(BorderFactory.createEmptyBorder(20, 20, 10, 20));
                 dialog.add(message, BorderLayout.CENTER);
 
-                // OK button at the bottom to close the popup
-                // ★ STUDENT CODE: JButton to close the dialog ★
+            
+                // OK JButton to close the dialog ★
                 JButton okButton = new JButton("OK, I will crank it!");
                 okButton.setBackground(new Color(60, 100, 60));
                 okButton.setForeground(Color.WHITE);
@@ -566,10 +542,9 @@ class PianoPanel extends JPanel {
         }
     }
 
-    // -------------------------------------------------------
-    // HELPERS
-    // ★ STUDENT CODE: small reusable helper methods ★
-    // -------------------------------------------------------
+    // --------------------------
+    // Helpers (Consistent UI theme across the project) (Student Code)
+    // --------------------------
 
     private JButton makeButton(String buttonText, Color backgroundColor) {
         JButton button = new JButton(buttonText);
@@ -581,29 +556,18 @@ class PianoPanel extends JPanel {
         return button;
     }
 
-    // ★ STUDENT CODE: converts a note number into a readable name like C4 ★
+    // Student Code
+    // converting a note number into a readable name
     private String noteName(int noteNumber) {
         String[] noteNames = {"C","C#","D","D#","E","F","F#","G","G#","A","A#","B"};
         return noteNames[noteNumber % 12] + (noteNumber / 12 - 1);
     }
 }
 
-// =========================
-// SOUND PLAYER
-// =========================
+// --------------
+// Sound Player (AI Generated)
+//--------------
 class SoundPlayer {
-
-    // ============================================================
-    //  Copilot prompt:
-    //  "Make a Java class called SoundPlayer. This class makes the
-    //   piano produce sound using tools already built into Java.
-    //   It needs: a way to start playing a note (takes a note number
-    //   and volume), a way to stop a note (takes the note number),
-    //   a way to bend the pitch of whatever is playing (takes a
-    //   number 0-1000 where 0 is no bend and 1000 is maximum bend
-    //   upward), and a way to shut everything down when the program
-    //   closes. If the sound system cannot open, print what went wrong."
-    // ============================================================
 
     private Synthesizer synth;
     private MidiChannel channel;
@@ -639,9 +603,9 @@ class SoundPlayer {
     }
 }
 
-// =========================
-// PITCH ENGINE
-// =========================
+// -------------
+// Pitch Engine (AI generated)
+// -------------
 class PitchEngine {
 
     // ============================================================
@@ -700,9 +664,9 @@ class PitchEngine {
     }
 }
 
-// =========================
-// PITCH METER
-// =========================
+// -------------
+// Pitch Meter (AI Generated)
+// -------------
 class PitchMeter extends JComponent {
 
     // ============================================================
