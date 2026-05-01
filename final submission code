@@ -500,7 +500,7 @@ class PianoPanel extends JPanel {
             int currentPitch = pitch.getPitch();
 
 
-            //AI Generated            
+            //AI Generated (Prompt needed)         
             SwingUtilities.invokeLater(() -> {
 
                 JDialog dialog = new JDialog((JFrame) SwingUtilities.getWindowAncestor(this), "Out of Tune Warning", true);
